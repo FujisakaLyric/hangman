@@ -1,0 +1,17 @@
+--- !ruby/object:Round
+word: HINDSIGHT
+current_progress:
+- _
+- _
+- _
+- _
+- _
+- _
+- _
+- _
+- _
+letters_used: []
+letter_chosen: ''
+lives: 8
+is_playing: true
+to_save: true

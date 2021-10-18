@@ -1,89 +1,88 @@
-module RoundFunctions
-  def choose_word
-    @letter_chosen = gets.chomp.upcase
-    if @letters_used.include?(@letter_chosen)
-      puts "The letter #{@letter_chosen} is already chosen. Please choose another letter."
-    elsif @letter_chosen.length > 1
-      puts "Please choose only 1 letter!"
-    else
-      @letters_used << @letter_chosen
-      @letters_used.sort!
-      check_letter(@letter_chosen)
-    end
-  end
+require_relative 'round'
+require 'yaml'
 
-  def check_letter(letter)
-    is_correct = false
-    0.upto(@word.length - 1) do |index| 
-      if @word[index] == letter
-        @current_progress[index] = letter
-        is_correct = true
-      end
-    end
 
-    if is_correct
-      puts "Correct! You still have #{@lives} lives left."
-    else
-      @lives -= 1
-      puts "The letter #{letter} is not inside. #{@lives} lives left."
+def save_game(current_game)
+  filename = prompt_name
+  return false unless filename
+  dump = YAML.dump(current_game)
+  File.open(File.join(Dir.pwd, "/saves/#{filename}.yaml"), 'w') { |file| file.write dump }
+end
+
+def prompt_name
+  Dir.mkdir(File.join(Dir.pwd, "/saves/")) unless Dir.exist?(Dir.pwd + "/saves/")
+
+  begin
+    file_list = Dir.glob('saves/*').map { |file| file[(file.index('/') + 1)...(file.index('.'))]}
+    puts "Enter name for saved game:"
+    filename = gets.chomp
+    raise "#{filename} already exists." if file_list.include?(filename)
+    filename
+  rescue StandardError => e
+    puts "#{e} Are you sure you want to overwrite this file? (Y/N)"
+    answer = gets.chomp.upcase
+    until answer == "Y" || answer == "N"
+      puts "Invalid input. #{e} Are you sure you want to overwrite this file? (Y/N)"
+      answer = gets.chomp.upcase
     end
+    answer == "Y" ? filename : false
   end
 end
 
-class Round
-  include RoundFunctions
+def load_game
+  file_list = Dir.glob('saves/*').map { |file| file[(file.index('/') + 1)...(file.index('.'))] }
+  if file_list == []
+    puts "No save file available! Starting new game..."
+    return Round.new
+  end
   
-  attr_reader :is_playing
-  attr_accessor :current_progress
+  filename = choose_game
+  saved_file = File.open(File.join(Dir.pwd, filename), 'r')
+  loaded_game = YAML.load(saved_file)
+  saved_file.close
+  loaded_game
+end
 
-  def initialize(array)
-    @word = array[rand(array.length)]
-    @current_progress = []
-    0.upto(@word.length - 1) { |index| @current_progress[index] = "_" }
-    @letters_used = []
-    @letter_chosen = ""
-    @lives = 8
-    @is_playing = true
-    puts "#{@current_progress.join(" ")}"
-    puts ""
-  end
-
-  def play_turn
-    puts "Choose a letter! Current letters used: #{@letters_used.join(", ")} (#{@lives} lives left)"
-    choose_word
-
-    #Win Condition
-    unless @current_progress.include?("_")
-        @is_playing = false
-        display_board
-        puts "You Win!"
-        return
-    end
-
-    #GameOver Condition
-    if @lives == 0
-        @is_playing = false
-        display_board
-        puts "You Lose! The answer is #{@word}."
-        return
-    end
-
-    display_board
-  end
-
-  private
-  def display_board
-      puts ""
-      puts "#{@current_progress.join(" ")}"
-      puts ""
+def choose_game
+  begin
+    puts
+    puts "Here are the current saved games. Please choose which you'd like to load."
+    file_list = Dir.glob('saves/*').map { |file| file[(file.index('/') + 1)...(file.index('.'))] }
+    puts file_list
+    filename = gets.chomp
+    raise "#{filename} does not exist." unless file_list.include?(filename)
+    puts "#{filename} loaded..."
+    puts
+    "/saves/#{filename}.yaml"
+  rescue StandardError => e
+    puts e
+    retry
   end
 end
 
-word_list = File.read("5desk.txt").split("\r\n").select { |word| word.length >= 5 && word.length <= 12}
-word_list.map! {|word| word.upcase}
+# Main
+puts "Welcome to Hangman!"
+puts "Type \"1\" to start a new game."
+puts "Type \"2\" to load a game."
 
-game_round = Round.new(word_list)
+user_choice = gets.chomp
+until ['1', '2'].include?(user_choice)
+  puts "Invalid input. Please enter 1 or 2"
+  user_choice = gets.chomp
+end
 
-while (game_round.is_playing == true) do
+if user_choice == "1"
+  game_round = Round.new
+else
+  game_round = load_game
+end
+
+while game_round.is_playing == true do
   game_round.play_turn
+  if game_round.to_save == true
+    if save_game(game_round)
+      puts "Your game has been saved. Thanks for playing!"
+      break
+    end
+  end
 end
